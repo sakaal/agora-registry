@@ -1,0 +1,68 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.agora-exchange.service</groupId>
+    <artifactId>agora-service</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>../agora-service</relativePath>
+  </parent>
+
+  <groupId>org.agora-exchange.service</groupId>
+  <artifactId>agora-registry</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>Agora Registry</name>
+  <url>http://www.agora-exchange.org/service/registry</url>
+  <description>Agora Registry JAX-RS implementation</description>
+
+  <scm>
+    <url>http://github.com/sakaal/agora-registry</url>
+    <connection>scm:git:git://github.com/sakaal/agora-registry.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/sakaal/agora-registry.git</developerConnection>
+  </scm>
+
+  <dependencies>
+
+    <dependency>
+      <groupId>org.agora-exchange.api</groupId>
+      <artifactId>agora-xml</artifactId>
+      <version>0.0.2-SNAPSHOT</version>
+    </dependency>
+
+    <dependency>
+        <groupId>javax.ws.rs</groupId>
+        <artifactId>jsr311-api</artifactId>
+        <version>1.1.1</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.sun.jersey</groupId>
+      <artifactId>jersey-server</artifactId>
+      <version>1.8</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.hibernate</groupId>
+      <artifactId>hibernate-entitymanager</artifactId>
+      <version>3.6.9.Final</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.hsqldb</groupId>
+      <artifactId>hsqldb</artifactId>
+      <version>2.2.8</version>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <plugins>
+
+
+    </plugins>
+  </build>
+
+</project>

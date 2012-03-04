@@ -1,0 +1,5 @@
+== Agora Registry ==
+
+Agora Exchange for Online Managed Services
+
+This is the agora-registry module.
