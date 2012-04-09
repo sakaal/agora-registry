@@ -11,8 +11,8 @@
   <groupId>org.agora-exchange.service</groupId>
   <artifactId>agora-registry</artifactId>
   <version>0.1.0-SNAPSHOT</version>
-  <packaging>jar</packaging>
-  <name>Agora Registry</name>
+  <packaging>war</packaging>
+  <name>Agora Registry Web Application</name>
   <url>http://www.agora-exchange.org/service/registry</url>
   <description>Agora Registry JAX-RS implementation</description>
 
@@ -28,6 +28,13 @@
       <groupId>org.agora-exchange.api</groupId>
       <artifactId>agora-xml</artifactId>
       <version>0.0.2-SNAPSHOT</version>
+    </dependency>
+
+    <dependency>
+        <groupId>javax</groupId>
+        <artifactId>javaee-api</artifactId>
+        <version>6.0</version>
+        <scope>provided</scope>
     </dependency>
 
     <dependency>
@@ -60,8 +67,25 @@
 
   <build>
     <plugins>
-
-
+      <plugin>
+        <groupId>org.glassfish</groupId>
+        <artifactId>maven-embedded-glassfish-plugin</artifactId>
+        <version>3.1.1</version>
+        <configuration>
+          <name>AgoraRegistry</name>
+          <contextRoot>agora</contextRoot>
+          <port>8080</port>
+          <!--configFile>src/test/resources/glassfish/domain.xml</configFile-->
+        </configuration>
+        <executions>
+          <execution>
+            <phase>pre-integration-test</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 

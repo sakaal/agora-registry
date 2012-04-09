@@ -11,18 +11,26 @@ import static javax.ws.rs.core.MediaType.APPLICATION_XML;
 import static java.net.HttpURLConnection.HTTP_NOT_FOUND;
 import static java.net.HttpURLConnection.HTTP_INTERNAL_ERROR;
 
+import static javax.transaction.Status.STATUS_ACTIVE;
+
 import static org.apache.commons.lang.StringUtils.isNotEmpty;
 
 import java.net.URI;
 import java.util.Date;
 import java.util.UUID;
 
-import javax.naming.InitialContext;
-import javax.naming.NamingException;
+import javax.ejb.EJBException;
+import javax.ejb.Stateless;
 import javax.persistence.EntityExistsException;
 import javax.persistence.EntityManager;
-import javax.persistence.EntityManagerFactory;
-import javax.persistence.EntityTransaction;
+import javax.persistence.PersistenceContext;
+import javax.persistence.PersistenceContextType;
+import javax.transaction.NotSupportedException;
+import javax.transaction.HeuristicMixedException;
+import javax.transaction.HeuristicRollbackException;
+import javax.transaction.RollbackException;
+import javax.transaction.SystemException;
+import javax.transaction.UserTransaction;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -50,8 +58,6 @@ import org.slf4j.LoggerFactory;
  *            JAXB/JPA annotated Record subclass
  */
 public abstract class Service<R extends Record> {
-    protected static final String JNDI_ENTITY_MANAGER_FACTORY =
-            "java:/persistence/AgoraEntityManagerFactory";
 
     protected final Logger logger = LoggerFactory.getLogger(getClass());
 
@@ -60,6 +66,11 @@ public abstract class Service<R extends Record> {
     protected abstract R find(String id, EntityManager manager);
 
     protected abstract void copy(R source, R target, EntityManager manager);
+
+    /**
+     * Derived class must inject this.
+     */
+    protected abstract UserTransaction getTransaction();
 
     private R createRecord(EntityManager manager) {
         R record = createRecord();
@@ -73,26 +84,6 @@ public abstract class Service<R extends Record> {
             }
         }
         throw new IllegalStateException("Repeated Record UUID collisions.");
-    }
-
-    /**
-     * The returned entity manager must be closed when no longer needed.
-     * 
-     * @return An <code>EntityManager</code> object.
-     */
-    private EntityManager createEntityManager() {
-        try {
-            EntityManagerFactory factory =
-                    (EntityManagerFactory) new InitialContext()
-                            .lookup(JNDI_ENTITY_MANAGER_FACTORY);
-            if (null == factory) {
-                throw new WebApplicationException(new NullPointerException(
-                        "EntityManagerFactory not found"), HTTP_INTERNAL_ERROR);
-            }
-            return factory.createEntityManager();
-        } catch (NamingException e) {
-            throw new WebApplicationException(e, HTTP_INTERNAL_ERROR);
-        }
     }
 
     @Context
@@ -111,12 +102,11 @@ public abstract class Service<R extends Record> {
     @POST
     @Consumes({ APPLICATION_XML, APPLICATION_JSON })
     @Produces({ APPLICATION_XML, APPLICATION_JSON })
-    public final Response post(R jaxb) {
-        EntityTransaction tx = null;
-        EntityManager manager = createEntityManager();
+    public Response post(R jaxb, EntityManager manager) {
+        UserTransaction tx = null;
         String id = jaxb.getId();
         try {
-            tx = manager.getTransaction();
+            tx = getTransaction();
             tx.begin();
 
             R record = isNotEmpty(id) ? find(id, manager) : null;
@@ -150,15 +140,32 @@ public abstract class Service<R extends Record> {
             tx = null;
             return response;
 
+        } catch (NotSupportedException nsx) {
+            // Nested transaction not supported.
+            throw new EJBException(nsx);
+        } catch (SystemException sx) {
+            throw new EJBException(sx);
+        } catch (RollbackException rx) {
+            throw new EJBException("Rolled back", rx);
+        } catch (HeuristicMixedException hx) {
+            throw new EJBException(hx);
+        } catch (HeuristicRollbackException hrx) {
+            throw new EJBException(hrx);
         } finally {
             if (null != tx) {
-                if (tx.isActive()) {
-                    tx.rollback();
+                try {
+                    if (STATUS_ACTIVE == tx.getStatus()) {
+                        tx.rollback();
+                    }
+                    else {
+                        tx.setRollbackOnly();
+                    }
+                } catch (SystemException sx) {
+                    throw new EJBException("Rollback failed", sx);
+                } finally {
+                    tx = null;
                 }
-                tx = null;
             }
-            manager.close();
-            manager = null;
         }
     }
 
@@ -168,14 +175,10 @@ public abstract class Service<R extends Record> {
      * @param id
      * @return
      */
-    @GET
-    @Path("{id}")
-    @Produces({ APPLICATION_XML, APPLICATION_JSON })
-    public final Response get(@PathParam("id") String id) {
-        EntityTransaction tx = null;
-        EntityManager manager = createEntityManager();
+    public Response get(String id, EntityManager manager) {
+        UserTransaction tx = null;
         try {
-            tx = manager.getTransaction();
+            tx = getTransaction();
             tx.begin();
             R record = find(id, manager);
             if (null == record) {
@@ -189,15 +192,32 @@ public abstract class Service<R extends Record> {
             tx = null;
             return response;
 
+        } catch (NotSupportedException nsx) {
+            // Nested transaction not supported.
+            throw new EJBException(nsx);
+        } catch (SystemException sx) {
+            throw new EJBException(sx);
+        } catch (RollbackException rx) {
+            throw new EJBException("Rolled back", rx);
+        } catch (HeuristicMixedException hx) {
+            throw new EJBException(hx);
+        } catch (HeuristicRollbackException hrx) {
+            throw new EJBException(hrx);
         } finally {
             if (null != tx) {
-                if (tx.isActive()) {
-                    tx.rollback();
+                try {
+                    if (STATUS_ACTIVE == tx.getStatus()) {
+                        tx.rollback();
+                    }
+                    else {
+                        tx.setRollbackOnly();
+                    }
+                } catch (SystemException sx) {
+                    throw new EJBException("Rollback failed", sx);
+                } finally {
+                    tx = null;
                 }
-                tx = null;
             }
-            manager.close();
-            manager = null;
         }
     }
 
@@ -212,11 +232,10 @@ public abstract class Service<R extends Record> {
     @Path("{id}")
     @Consumes({ APPLICATION_XML, APPLICATION_JSON })
     @Produces({ APPLICATION_XML, APPLICATION_JSON })
-    public Response put(@PathParam("id") String id, R jaxb) {
-        EntityTransaction tx = null;
-        EntityManager manager = createEntityManager();
+    public Response put(@PathParam("id") String id, R jaxb, EntityManager manager) {
+        UserTransaction tx = null;
         try {
-            tx = manager.getTransaction();
+            tx = getTransaction();
             tx.begin();
 
             R record = find(id, manager);
@@ -246,15 +265,32 @@ public abstract class Service<R extends Record> {
             tx = null;
             return response;
 
+        } catch (NotSupportedException nsx) {
+            // Nested transaction not supported.
+            throw new EJBException(nsx);
+        } catch (SystemException sx) {
+            throw new EJBException(sx);
+        } catch (RollbackException rx) {
+            throw new EJBException("Rolled back", rx);
+        } catch (HeuristicMixedException hx) {
+            throw new EJBException(hx);
+        } catch (HeuristicRollbackException hrx) {
+            throw new EJBException(hrx);
         } finally {
             if (null != tx) {
-                if (tx.isActive()) {
-                    tx.rollback();
+                try {
+                    if (STATUS_ACTIVE == tx.getStatus()) {
+                        tx.rollback();
+                    }
+                    else {
+                        tx.setRollbackOnly();
+                    }
+                } catch (SystemException sx) {
+                    throw new EJBException("Rollback failed", sx);
+                } finally {
+                    tx = null;
                 }
-                tx = null;
             }
-            manager.close();
-            manager = null;
         }
     }
 
@@ -267,11 +303,10 @@ public abstract class Service<R extends Record> {
     @DELETE
     @Path("{id}")
     @Produces({ APPLICATION_XML, APPLICATION_JSON })
-    public Response delete(@PathParam("id") String id) {
-        EntityTransaction tx = null;
-        EntityManager manager = createEntityManager();
+    public Response delete(@PathParam("id") String id, EntityManager manager) {
+        UserTransaction tx = null;
         try {
-            tx = manager.getTransaction();
+            tx = getTransaction();
             tx.begin();
             R record = find(id, manager);
             if (null == record) {
@@ -288,15 +323,32 @@ public abstract class Service<R extends Record> {
             tx = null;
             return response;
 
+        } catch (NotSupportedException nsx) {
+            // Nested transaction not supported.
+            throw new EJBException(nsx);
+        } catch (SystemException sx) {
+            throw new EJBException(sx);
+        } catch (RollbackException rx) {
+            throw new EJBException("Rolled back", rx);
+        } catch (HeuristicMixedException hx) {
+            throw new EJBException(hx);
+        } catch (HeuristicRollbackException hrx) {
+            throw new EJBException(hrx);
         } finally {
             if (null != tx) {
-                if (tx.isActive()) {
-                    tx.rollback();
+                try {
+                    if (STATUS_ACTIVE == tx.getStatus()) {
+                        tx.rollback();
+                    }
+                    else {
+                        tx.setRollbackOnly();
+                    }
+                } catch (SystemException sx) {
+                    throw new EJBException("Rollback failed", sx);
+                } finally {
+                    tx = null;
                 }
-                tx = null;
             }
-            manager.close();
-            manager = null;
         }
     }
 }

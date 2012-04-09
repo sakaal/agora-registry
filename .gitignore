@@ -14,3 +14,6 @@ target/
 .classpath
 .project
 .settings/
+
+# Maven Embedded Glassfish
+*.log
