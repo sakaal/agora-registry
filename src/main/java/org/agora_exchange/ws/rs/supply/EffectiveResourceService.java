@@ -5,7 +5,6 @@
  */
 package org.agora_exchange.ws.rs.supply;
 
-import static javax.ejb.TransactionManagementType.BEAN;
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON;
 import static javax.ws.rs.core.MediaType.APPLICATION_XML;
 
@@ -13,14 +12,16 @@ import java.net.HttpURLConnection;
 import java.util.Date;
 import java.util.List;
 
-import javax.annotation.Resource;
 import javax.ejb.Stateless;
-import javax.ejb.TransactionManagement;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.persistence.PersistenceContextType;
-import javax.transaction.UserTransaction;
+import javax.persistence.TypedQuery;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -36,20 +37,12 @@ import org.agora_exchange.xml.supply.EffectiveResource;
  */
 @Path("resources")
 @Stateless
-@TransactionManagement(BEAN)
-public class EffectiveResourceService extends Service<EffectiveResource> {
+public class EffectiveResourceService extends Service<EffectiveResource>
+{
 
     @PersistenceContext(unitName = "org.agora_exchange.xml",
-        type=PersistenceContextType.TRANSACTION)
+            type = PersistenceContextType.TRANSACTION)
     private EntityManager manager;
-
-    @Resource
-    private UserTransaction tx;
-
-    @Override
-    protected UserTransaction getTransaction() {
-        return tx;
-    }
 
     @Override
     public EffectiveResource createRecord() {
@@ -57,7 +50,8 @@ public class EffectiveResourceService extends Service<EffectiveResource> {
     }
 
     @Override
-    public void copy(EffectiveResource source, EffectiveResource target, EntityManager em) {
+    public void copy(EffectiveResource source, EffectiveResource target,
+            EntityManager em) {
         // TODO:
     }
 
@@ -67,11 +61,64 @@ public class EffectiveResourceService extends Service<EffectiveResource> {
                 org.agora_exchange.xml.supply.EffectiveResource.class, id);
     }
 
+    @POST
+    @Consumes({ APPLICATION_XML, APPLICATION_JSON })
+    @Produces({ APPLICATION_XML, APPLICATION_JSON })
+    public Response post(EffectiveResource jaxb) {
+        return post(jaxb, manager);
+    }
+
+    @PUT
+    @Path("{id}")
+    @Consumes({ APPLICATION_XML, APPLICATION_JSON })
+    @Produces({ APPLICATION_XML, APPLICATION_JSON })
+    public Response put(@PathParam("id") String id, EffectiveResource jaxb) {
+        return put(id, jaxb, manager);
+    }
+
     @GET
     @Path("{id}")
     @Produces({ APPLICATION_XML, APPLICATION_JSON })
     public Response get(@PathParam("id") String id) {
-        return super.get(id, manager);
+        return get(id, manager);
+    }
+
+    @DELETE
+    @Path("{id}")
+    @Produces({ APPLICATION_XML, APPLICATION_JSON })
+    public Response delete(@PathParam("id") String id) {
+        return delete(id, manager);
+    }
+
+    @GET
+    @Path("/")
+    @Produces({ APPLICATION_XML, APPLICATION_JSON })
+    public Response getByReservation(
+            @QueryParam("reservation") String reservationId) {
+
+        TypedQuery<EffectiveResource> query =
+                manager.createQuery("SELECT i FROM EffectiveResource i "
+                        + "WHERE i.reservationId = :reservationId",
+                        EffectiveResource.class);
+        query.setParameter("reservationId", reservationId);
+        List<EffectiveResource> resources = query.getResultList();
+
+        if (null == resources || resources.isEmpty()) {
+            ResponseBuilder response =
+                    Response.status(HttpURLConnection.HTTP_NOT_FOUND);
+            return response.build();
+        }
+
+        Date lastModified = new Date(Long.MIN_VALUE);
+        for (EffectiveResource entity : resources) {
+            if (lastModified.before(entity.getUpdated())) {
+                lastModified = entity.getUpdated();
+            }
+        }
+
+        ResponseBuilder response = Response.ok(resources);
+        response.lastModified(lastModified);
+        return response.build();
+
     }
 }
-
