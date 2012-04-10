@@ -15,7 +15,6 @@ import java.util.List;
 import javax.ejb.Stateless;
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
-import javax.persistence.PersistenceContextType;
 import javax.persistence.TypedQuery;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.DELETE;
@@ -39,26 +38,17 @@ import org.agora_exchange.xml.supply.EffectiveResource;
 @Stateless
 public class EffectiveResourceService extends Service<EffectiveResource>
 {
-
-    @PersistenceContext(unitName = "org.agora_exchange.xml",
-            type = PersistenceContextType.TRANSACTION)
+    @PersistenceContext(unitName = "org.agora_exchange.xml")
     private EntityManager manager;
 
-    @Override
-    public EffectiveResource createRecord() {
-        return new EffectiveResource();
+    public EffectiveResourceService() {
+        super(EffectiveResource.class);
     }
 
     @Override
     public void copy(EffectiveResource source, EffectiveResource target,
             EntityManager em) {
         // TODO:
-    }
-
-    @Override
-    protected EffectiveResource find(String id, EntityManager manager) {
-        return manager.find(
-                org.agora_exchange.xml.supply.EffectiveResource.class, id);
     }
 
     @POST

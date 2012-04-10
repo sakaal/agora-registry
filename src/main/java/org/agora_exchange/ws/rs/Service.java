@@ -13,6 +13,7 @@ import java.net.URI;
 import java.util.Date;
 import java.util.UUID;
 
+import javax.ejb.EJBException;
 import javax.persistence.EntityExistsException;
 import javax.persistence.EntityManager;
 import javax.ws.rs.PathParam;
@@ -37,9 +38,21 @@ public abstract class Service<R extends Record>
 {
     protected final Logger logger = LoggerFactory.getLogger(getClass());
 
-    protected abstract R createRecord();
+    private final Class<R> recordClass;
 
-    protected abstract R find(String id, EntityManager manager);
+    protected Service(Class<R> recordType) {
+        recordClass = recordType;
+    }
+
+    private R createRecord() {
+        try {
+            return recordClass.newInstance();
+        } catch (InstantiationException e) {
+            throw new EJBException(e);
+        } catch (IllegalAccessException e) {
+            throw new EJBException(e);
+        }
+    }
 
     /**
      * Copies data from the source record to the target record without
@@ -84,7 +97,7 @@ public abstract class Service<R extends Record>
     protected Response post(R jaxb, EntityManager manager) {
         String id = jaxb.getId();
 
-        R record = isNotEmpty(id) ? find(id, manager) : null;
+        R record = isNotEmpty(id) ? manager.find(recordClass, id) : null;
 
         ResponseBuilder builder;
         if (null == record) {
@@ -122,7 +135,7 @@ public abstract class Service<R extends Record>
      * @return
      */
     protected Response get(String id, EntityManager manager) {
-        R record = find(id, manager);
+        R record = manager.find(recordClass, id);
         if (null == record) {
             return Response.status(HTTP_NOT_FOUND).build();
         }
@@ -143,7 +156,7 @@ public abstract class Service<R extends Record>
     protected Response put(@PathParam("id") String id, R jaxb,
             EntityManager manager) {
 
-        R record = find(id, manager);
+        R record = manager.find(recordClass, id);
 
         ResponseBuilder builder;
 
@@ -176,7 +189,7 @@ public abstract class Service<R extends Record>
      * @return
      */
     public Response delete(@PathParam("id") String id, EntityManager manager) {
-        R record = find(id, manager);
+        R record = manager.find(recordClass, id);
         if (null == record) {
             return Response.status(HTTP_NOT_FOUND).build();
         }
